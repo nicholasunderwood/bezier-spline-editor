@@ -48,10 +48,10 @@ public class Bezier extends PApplet {
   
   void draw()
   {
-    background(120);
+    background(100);
     for(int i = 0; i < points.size(); i++){
       Vector2 point = points.get(i);
-      stroke(100);
+      stroke(60);
       if(i>0 && drawConnections){
         line((float) points.get(i).x, (float) points.get(i).y, (float) points.get(i-1).x, (float) points.get(i-1).y);
       }
@@ -85,54 +85,74 @@ public class Bezier extends PApplet {
   int getOppHandleIndex(int index) { return index % 3 == 1 ? index - 2 : index + 2; }
   int getAnchorIndex(int index) { return index % 3 == 1 ? index - 1 : index + 1; }
   
-  void mousePressed(){
-    if(mouseButton == RIGHT){
-      if(anchor == null){
-        anchor = new Vector2(mouseX, mouseY);
+  void addPoint(int x, int y){
+    if(anchor == null){
+        anchor = new Vector2(x, y);
         points.add(anchor);
       }
       else{
         if(points.size() > 1){
           points.add(
             points.size()-1, 
-            new Vector2( anchor.x*2 - mouseX, anchor.y*2 - mouseY)
+            new Vector2( anchor.x*2 - x, anchor.y*2 - y)
           );
         }
         //points.add(anchor);
-        points.add(new Vector2(mouseX, mouseY));
+        points.add(new Vector2(x, y));
         anchor = null;
       }
+  }
+  
+  void movePoint(){
+    for(int i = 0;i < points.size();i++){
+          Vector2 point = points.get(i);
+          if(Math.sqrt(Math.pow(point.x - mouseX, 2) + Math.pow(point.y - mouseY, 2)) < hoverDistance){
+            drag = point;
+            if(hasOppHandle(i)) {
+              dragOppHandle = points.get(getOppHandleIndex(i));
+              dragAnchor = points.get(getAnchorIndex(i));    
+            }
+            else if(isAnchor(i)){
+              if(i > 0){
+                  dragHandle1 = points.get(i-1);
+              }
+              if(i < points.size()){
+                  dragHandle2 = points.get(i+1);
+              }
+            }
+            if(keyCode == 16 && keyPressed){
+              if(drag == anchor){
+                anchor = null;
+              }
+              points.remove(drag);
+              points.remove(dragOppHandle);
+              points.remove(dragAnchor);
+              points.remove(dragHandle1);
+              points.remove(dragHandle2);
+            }
+            break;
+          }
+      }
+  }
+  
+  void randomPoints(int numPoints){
+     for(int i = 0;i<numPoints;i++){
+       int x = (int) (Math.random()*width);
+       int y = (int) (Math.random()*height);
+       addPoint(x,y);
+       addPoint(
+         (int) (Math.random()*300) + x - 150,
+         (int) (Math.random()*300) + y - 150
+       );
+     }
+  }
+  
+  void mousePressed(){
+    if(mouseButton == RIGHT){
+      addPoint(mouseX, mouseY);
     }
     else if(mouseButton == LEFT){
-      for(int i = 0;i < points.size();i++){
-        Vector2 point = points.get(i);
-        if(Math.sqrt(Math.pow(point.x - mouseX, 2) + Math.pow(point.y - mouseY, 2)) < hoverDistance){
-          drag = point;
-          if(hasOppHandle(i)) {
-            dragOppHandle = points.get(getOppHandleIndex(i));
-            dragAnchor = points.get(getAnchorIndex(i));    
-          }
-          else if(isAnchor(i)){
-            if(i > 0){
-                dragHandle1 = points.get(i-1);
-            }
-            if(i < points.size()){
-                dragHandle2 = points.get(i+1);
-            }
-          }
-          if(keyCode == 16 && keyPressed){
-            if(drag == anchor){
-              anchor = null;
-            }
-            points.remove(drag);
-            points.remove(dragOppHandle);
-            points.remove(dragAnchor);
-            points.remove(dragHandle1);
-            points.remove(dragHandle2);
-          }
-          break;
-        }
-      }
+      movePoint();
     }
   }
   
@@ -175,6 +195,8 @@ public class Bezier extends PApplet {
         drawHandles = true;
         drawAnchors = true;
       }
+    } else if(key == 'r'){
+      randomPoints(1);
     }
   }
   
