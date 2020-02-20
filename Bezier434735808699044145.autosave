@@ -1,16 +1,14 @@
-import java.text.DecimalFormat;
-
 public class Bezier extends PApplet {
   
   class Vector2 {
     float x,y;
-    public Vector2(float x, float y) { this.x = x; this.y = y; }
-    public Vector2(float x) { this(x, x); } 
-    public Vector2() { this(0.0, 0.0); }
+
+    public Vector2(float x, float y){ this.x = x; this.y = y; }
     public Vector2 add(float other){ this.x += other; this.y += other; return this; }
     public Vector2 add(Vector2 other){ this.x += other.x; this.y += other.y; return this; }
     public Vector2 mult(float other){ this.x *= other; this.y *= other; return this; }
     public Vector2 mult(Vector2 other){ this.x *= other.x; this.y *= other.y; return this; }
+
     @Override
     public String toString(){ return "<" + this.x + "," + this.y + ">"; }
   }
@@ -26,26 +24,28 @@ public class Bezier extends PApplet {
       return x * frac(x-1);
     }
 
-    public Vector2 getPoint(float u){
-      //println("get point: " + u);
-      int n = waypoints.size()-1;
-      println(n);
-      int x = 0; int y = 0;
+    public Vector2 getPoint(Double u){
+      int size = waypoints.size();
+      int x = 0;
+      int y = 0;
       //Vector2 sum = new Vector2(0,0);
-      for(int i = 0; i <= n; i++){
+      for(int i = 0; i < waypoints.size(); i++){
         Vector2 point = waypoints.get(i);
-        //println("A: " + frac(n) / frac(i) / frac(n-i));
-        //println("B: " + Math.pow(u,i));
-        //println("C: " + Math.pow(1-u, n-i));
-        x += frac(n) / frac(i) / frac(n-i) * Math.pow(u,i) * Math.pow(1-u, n-i) * point.x;
-        y += frac(n) / frac(i) / frac(n-i) * Math.pow(u,i) * Math.pow(1-u, n-i) * point.y;
-
+        double k = frac(size) / frac(i) / frac(size-i) * Math.pow(u,i) * Math.pow(1-u, size-i);
+        x += k * point.x; y += k * point.y;
       }
       return new Vector2(x,y);
     }
 
     public void addPoint(Vector2 point){ waypoints.add(point); }
   }
+  
+  int dragIndex;
+  boolean isDraggingHandleWithOppHandle;
+  boolean isDraggingAnchor;
+  
+  Vector2 drag;
+  Vector2 anchor;
   
   boolean drawConnections = true;
   boolean drawHandles = true;
@@ -54,8 +54,6 @@ public class Bezier extends PApplet {
   final int hoverDistance = 10;
   final int splineSize = 30;
   final int pointsPerSpline = 1000;
-  final DecimalFormat df = new DecimalFormat("0.00");
-  Vector2 drag;
   ArrayList<Vector2> points = new ArrayList();
   // ArrayList<BezierCurve> splines = new ArrayList();
   BezierCurve spline = new BezierCurve(points);
@@ -63,10 +61,6 @@ public class Bezier extends PApplet {
   void setup()
   {
     surface.setSize(1000, 700);
-    points.add(new Vector2(100.0, 100.0));
-    points.add(new Vector2(200.0, 200.0));
-    println(spline.getPoint(1.0));
-    drawSplines();
   }
   
   void draw()
@@ -79,18 +73,23 @@ public class Bezier extends PApplet {
         line(point.x, point.y, points.get(i+1).x, points.get(i+1).y);
       }
       stroke(225);
-      circle(point.x, point.y, 6.0);
+      circle((float) point.x, (float) point.y, 6.0);
     }
+    // noFill();
     drawSplines();
+    // fill(255);
+    println(points);
+    double z = 0.0;
+    println(spline.getPoint(z));
   }
   
   void drawSplines(){
     if(points.size() == 0) return;
     Vector2 lastPoint = points.get(0);
     Vector2 point;
-    for(float i=0; i<=1; i+= 1.0/pointsPerSpline){
+    for(double i=0; i<=1; i+= 1.0/pointsPerSpline){
       point = spline.getPoint(i);
-      circle((float) point.x, (float) point.y, 3f);
+      //println(i);
       line((float) point.x, (float) point.y, (float) lastPoint.x, (float) lastPoint.y);
       lastPoint = point;
     }
