@@ -29,16 +29,11 @@ public class Bezier extends PApplet {
     public Vector2 getPoint(float u){
       //println("get point: " + u);
       int n = waypoints.size()-1;
-      println(n);
       int x = 0; int y = 0;
-      //Vector2 sum = new Vector2(0,0);
       for(int i = 0; i <= n; i++){
         Vector2 point = waypoints.get(i);
-        //println("A: " + frac(n) / frac(i) / frac(n-i));
-        //println("B: " + Math.pow(u,i));
-        //println("C: " + Math.pow(1-u, n-i));
-        x += frac(n) / frac(i) / frac(n-i) * Math.pow(u,i) * Math.pow(1-u, n-i) * point.x;
-        y += frac(n) / frac(i) / frac(n-i) * Math.pow(u,i) * Math.pow(1-u, n-i) * point.y;
+        double coef = frac(n) / frac(i) / frac(n-i) * Math.pow(u,i) * Math.pow(1-u, n-i);
+        x += coef * point.x; y += coef * point.y;
 
       }
       return new Vector2(x,y);
@@ -65,7 +60,6 @@ public class Bezier extends PApplet {
     surface.setSize(1000, 700);
     points.add(new Vector2(100.0, 100.0));
     points.add(new Vector2(200.0, 200.0));
-    println(spline.getPoint(1.0));
     drawSplines();
   }
   
@@ -97,17 +91,38 @@ public class Bezier extends PApplet {
   }
   
   void addPoint(int x, int y){
-    points.add(new Vector2(x,y));
+    Vector2 point = new Vector2(x,y);
+    for(int i=1;i<points.size();i++){
+      if(isInline(point, points.get(i-1), points.get(i))){
+        println("point is inline");
+        points.add(i, new Vector2(x,y));
+        return;
+      }
+    }
+    points.add(points.size()-1, new Vector2(x,y));
   }
   
   void movePoint(){
     for(int i = 0;i < points.size();i++){
       Vector2 point = points.get(i);
       if(Math.sqrt(Math.pow(point.x - mouseX, 2) + Math.pow(point.y - mouseY, 2)) < hoverDistance){
-        drag = point;
-        break;
+        if(keyPressed && keyCode == SHIFT){
+          points.remove(point);
+        } else{  
+          drag = point;
+        }
+        return;
       }
     }
+  }
+  
+  boolean isInline(Vector2 point, Vector2 point1, Vector2 point2){
+    println((point.x-point1.x) / (point1.x-point2.x));
+    println((point.y-point1.y) / (point1.y-point2.y));
+    return Math.abs(
+      (point.x-point1.x) / (point1.x-point2.x) -
+      (point.y-point1.y) / (point1.y-point2.y)
+    ) < 0.3; 
   }
   
   
@@ -130,21 +145,17 @@ public class Bezier extends PApplet {
     drag = null;
   }
   
-  void keyPressed(){ 
-    if(key == ' '){
-      if (drawConnections) drawConnections = false;
-      else if (drawHandles) drawHandles = false;
-      else if (drawAnchors) drawAnchors = false;
-      else {
-        drawConnections = true;
-        drawHandles = true;
-        drawAnchors = true;
-      }
-    }
-  }
-  
-  void mouseMoved(){
-    
-  }
+  //void keyPressed(){ 
+  //  if(key == ' '){
+  //    if (drawConnections) drawConnections = false;
+  //    else if (drawHandles) drawHandles = false;
+  //    else if (drawAnchors) drawAnchors = false;
+  //    else {
+  //      drawConnections = true;
+  //      drawHandles = true;
+  //      drawAnchors = true;
+  //    }
+  //  }
+  //}
   
 }
