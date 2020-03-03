@@ -19,14 +19,8 @@ public class Bezier extends PApplet {
     public BezierCurve(ArrayList<Vector2> points) { waypoints = points; }
     public BezierCurve(Vector2 point1, Vector2 point2) {this(); waypoints.add(point1); waypoints.add(point2);}
     public BezierCurve() { waypoints = new ArrayList<Vector2>(); }
-
-    private double frac(int x){
-      if(x == 0) return 1.0;
-      return x * frac(x-1);
-    }
-    
+    private double frac(int x) { return x <= 1 ? 1 : x * frac(x-1); }  
     public int size(){ return waypoints.size(); }
-    
     public Vector2 getPoint(float u){
       int n = waypoints.size()-1;
       int x = 0; int y = 0;
@@ -38,23 +32,29 @@ public class Bezier extends PApplet {
       return new Vector2(x,y);
     }
     public Vector2 getWaypoint(int index){ return waypoints.get(index); }
-    public Vector2 lastWaypoint() { return waypoints.get(size()-1); }
+    public Vector2 firstPoint() { return waypoints.get(0); }
+    public Vector2 lastPoint() { return waypoints.get(size()-1); }
+    public Vector2 firstControl() { return waypoints.get(1); }
+    public Vector2 lastControl() { return waypoints.get(size()-2); }
     public void addPoint(Vector2 point){ waypoints.add(point); }
     public void addPoint(Vector2 point, int index){ waypoints.add(index, point); }
-    public void removePoint(Vector2 point) { waypoints.remove(point); }
+    public void removePoint(Vector2 point) { 
+      waypoints.remove(point); if(size() == 0){ splines.remove(this); }
+    }
     @Override public String toString() { return waypoints.toString(); }
   }
   
-  boolean drawConnections = true;
-  boolean drawHandles = true;
-  boolean drawAnchors = true;
+  public enum DragType { Anchor, Control };
   
+  DragType dragType = null;
+  Vector2 draggingPoint = null;
+  Vector2 followingPoint1 = null;
+  Vector2 followingPoint2 = null;
+  
+  ArrayList<BezierCurve> splines = new ArrayList();
   final int hoverDistance = 10;
   final int splineSize = 30;
   final int pointsPerSpline = 30;
-  final DecimalFormat df = new DecimalFormat("0.00");
-  Vector2 drag;
-  ArrayList<BezierCurve> splines = new ArrayList();
   
   void setup()
   {
@@ -101,7 +101,7 @@ public class Bezier extends PApplet {
         line(point.x, point.y, lastPoint.x, lastPoint.y);
         lastPoint = point;
       }
-      point = spline.lastWaypoint();
+      point = spline.lastPoint();
       line(point.x, point.y, lastPoint.x, lastPoint.y);
     }
   }
@@ -116,23 +116,36 @@ public class Bezier extends PApplet {
         }
       }
     }
-    splines.add(new BezierCurve(splines.get(splines.size()-1).lastWaypoint(), point));
+    splines.add(new BezierCurve(splines.get(splines.size()-1).lastPoint(), point));
   }
   
   void movePoint(){
+    BezierCurve lastSpline = null;
     for(BezierCurve spline : splines){
-      
       for(int i = 0;i < spline.size();i++){
         Vector2 point = spline.getWaypoint(i);
         if(Math.sqrt(Math.pow(point.x - mouseX, 2) + Math.pow(point.y - mouseY, 2)) < hoverDistance){
           if(keyPressed && keyCode == SHIFT){
             spline.removePoint(point);
-          } else {
-            drag = point;
+            return;
           }
+          draggingPoint = point;
+          if(i == 0 && lastSpline != null){
+            dragType = DragType.Anchor;
+            followingPoint1 = spline.firstControl();
+            followingPoint2 = lastSpline.lastControl();
+          } else if(i == 1 && lastSpline != null){
+            dragType = DragType.Control;
+            followingPoint1 = spline.firstPoint();
+            followingPoint2 = lastSpline.firstControl();
+          } else {
+            dragType = null;
+          }
+          println(dragType);
           return;
         }
       }
+      lastSpline = spline;
     }
   }
   
@@ -147,33 +160,26 @@ public class Bezier extends PApplet {
   void mousePressed(){
     if(mouseButton == RIGHT){
       addPoint(mouseX, mouseY);
-    }
-     else if(mouseButton == LEFT){
+    } else if(mouseButton == LEFT){
        movePoint();
-     }
+    }
   }
   
   void mouseDragged(){
-    if(drag == null) return;
-    drag.x = mouseX;
-    drag.y = mouseY;
+    if(draggingPoint == null) return;
+    draggingPoint.x = mouseX;
+    draggingPoint.y = mouseY;
+    if(dragType == null) return;
+    if(dragType == DragType.Anchor){
+    
+    } else if (dragType == DragType.Control){
+      
+    }
   }
   
   void mouseReleased(){
-    drag = null;
+    draggingPoint = null;
+    followingPoint1 = null;
+    followingPoint2 = null;
   }
-  
-  //void keyPressed(){ 
-  //  if(key == ' '){
-  //    if (drawConnections) drawConnections = false;
-  //    else if (drawHandles) drawHandles = false;
-  //    else if (drawAnchors) drawAnchors = false;
-  //    else {
-  //      drawConnections = true;
-  //      drawHandles = true;
-  //      drawAnchors = true;
-  //    }
-  //  }
-  //}
-  
 }
