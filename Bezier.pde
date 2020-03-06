@@ -2,6 +2,10 @@ import java.text.DecimalFormat;
 
 public class Bezier extends PApplet {
   
+  static public void main(String args[]) {
+    PApplet.main("Bezier");
+  }
+  
   class Vector2 {
     float x,y;
     public Vector2(float x, float y) { this.x = x; this.y = y; }
@@ -18,6 +22,7 @@ public class Bezier extends PApplet {
     private ArrayList<Vector2> waypoints;
     public BezierCurve(ArrayList<Vector2> points) { waypoints = points; }
     public BezierCurve(Vector2 point1, Vector2 point2) {this(); waypoints.add(point1); waypoints.add(point2);}
+    public BezierCurve(Vector2 point) {this(); waypoints.add(point);}
     public BezierCurve() { waypoints = new ArrayList<Vector2>(); }
     private double frac(int x) { return x <= 1 ? 1 : x * frac(x-1); }  
     public int size(){ return waypoints.size(); }
@@ -53,7 +58,7 @@ public class Bezier extends PApplet {
   
   ArrayList<BezierCurve> splines = new ArrayList();
   final int hoverDistance = 10;
-  final int splineSize = 30;
+  final int splineSize = 50;
   final int pointsPerSpline = 30;
   
   void setup()
@@ -116,7 +121,11 @@ public class Bezier extends PApplet {
         }
       }
     }
-    splines.add(new BezierCurve(splines.get(splines.size()-1).lastPoint(), point));
+    if( splines.size() > 0 ) {
+      splines.add(new BezierCurve(splines.get(splines.size()-1).lastPoint(), point));
+    } else {
+      splines.add(new BezierCurve(point));
+    }
   }
   
   void movePoint(){
@@ -130,6 +139,8 @@ public class Bezier extends PApplet {
             return;
           }
           draggingPoint = point;
+          println(i);
+          println(lastSpline != null);
           if(i == 0 && lastSpline != null){
             dragType = DragType.Anchor;
             followingPoint1 = spline.firstControl();
@@ -149,17 +160,46 @@ public class Bezier extends PApplet {
     }
   }
   
+  Vector2 getWaypoint(Float x, Float y){
+    for(BezierCurve spline : splines){
+      for(int i = 0;i < spline.size();i++){
+        Vector2 point = spline.getWaypoint(i);
+        if(Math.sqrt(Math.pow(point.x - x, 2) + Math.pow(point.y - y, 2)) < hoverDistance){
+          return point;
+        }
+      }
+    }
+    return null;
+  }
+  
+  void interlopePoint(float x, float y){
+    for(BezierCurve spline : splines){
+      for(int i = 0;i < spline.size();i++){
+        Vector2 point = spline.getWaypoint(i);
+        if(Math.sqrt(Math.pow(point.x - x, 2) + Math.pow(point.y - y, 2)) < hoverDistance){
+        }
+      }
+    }
+  }
+  
   boolean isInline(Vector2 point, Vector2 point1, Vector2 point2){
-    return Math.abs(
-      (point.x-point1.x) / (point1.x-point2.x) -
-      (point.y-point1.y) / (point1.y-point2.y)
-    ) < 0.5; 
+    println(point.x + " " + point1.x);
+    double ux = Math.abs( (point.x-point1.x) / (point2.x-point1.x) );
+    double uy = Math.abs( (point.y-point1.y) / (point2.y-point1.y) );
+    println(ux + " " + uy);
+    if( ux < 0 || ux > 1 || uy < 0 || uy > 1){
+      println("to far");
+      return false;
+    }
+    return Math.abs( ux - uy ) < 0.2; 
   }
   
   
   void mousePressed(){
     if(mouseButton == RIGHT){
       addPoint(mouseX, mouseY);
+    } else if (mouseButton == CENTER){
+      interlopePoint(mouseX, mouseY);
     } else if(mouseButton == LEFT){
        movePoint();
     }
@@ -182,4 +222,5 @@ public class Bezier extends PApplet {
     followingPoint1 = null;
     followingPoint2 = null;
   }
+  
 }

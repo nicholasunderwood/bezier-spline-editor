@@ -1,188 +1,226 @@
+import java.text.DecimalFormat;
+
 public class Bezier extends PApplet {
   
-  class Vector2{
-    double x,y;
-    double deltaX = 0;
-    double deltaY = 0;
-    public Vector2(double x, double y){
-      this.x = x;
-      this.y = y;
-    }
-    public Vector2 add(Vector2 other){
-      return new Vector2(this.x + other.x, this.y + other.y);
-    }
-    public Vector2 mult(double other){
-      return new Vector2(this.x * other, this.y * other);
-    }
-    @Override
-    public String toString(){
-      return String.format("<{0}, {1}>", this.x, this.y);
-    }
+  static public void main(String args[]) {
+    PApplet.main("Bezier");
   }
   
+  class Vector2 {
+    float x,y;
+    public Vector2(float x, float y) { this.x = x; this.y = y; }
+    public Vector2(float x) { this(x, x); } 
+    public Vector2() { this(0.0, 0.0); }
+    public Vector2 add(float other){ this.x += other; this.y += other; return this; }
+    public Vector2 add(Vector2 other){ this.x += other.x; this.y += other.y; return this; }
+    public Vector2 mult(float other){ this.x *= other; this.y *= other; return this; }
+    public Vector2 mult(Vector2 other){ this.x *= other.x; this.y *= other.y; return this; }
+    @Override public String toString(){ return "<" + this.x + "," + this.y + ">"; }
+  }
 
+  class BezierCurve {
+    private ArrayList<Vector2> waypoints;
+    public BezierCurve(ArrayList<Vector2> points) { waypoints = points; }
+    public BezierCurve(Vector2 point1, Vector2 point2) {this(); waypoints.add(point1); waypoints.add(point2);}
+    public BezierCurve(Vector2 point) {this(); waypoints.add(point);}
+    public BezierCurve() { waypoints = new ArrayList<Vector2>(); }
+    private double frac(int x) { return x <= 1 ? 1 : x * frac(x-1); }  
+    public int size(){ return waypoints.size(); }
+    public Vector2 getPoint(float u){
+      int n = waypoints.size()-1;
+      int x = 0; int y = 0;
+      for(int i = 0; i <= n; i++){
+        Vector2 point = waypoints.get(i);
+        double coef = frac(n) / frac(i) / frac(n-i) * Math.pow(u,i) * Math.pow(1-u, n-i);
+        x += coef * point.x; y += coef * point.y;
+      }
+      return new Vector2(x,y);
+    }
+    public Vector2 getWaypoint(int index){ return waypoints.get(index); }
+    public Vector2 firstPoint() { return waypoints.get(0); }
+    public Vector2 lastPoint() { return waypoints.get(size()-1); }
+    public Vector2 firstControl() { return waypoints.get(1); }
+    public Vector2 lastControl() { return waypoints.get(size()-2); }
+    public void addPoint(Vector2 point){ waypoints.add(point); }
+    public void addPoint(Vector2 point, int index){ waypoints.add(index, point); }
+    public void removePoint(Vector2 point) { 
+      waypoints.remove(point); if(size() == 0){ splines.remove(this); }
+    }
+    @Override public String toString() { return waypoints.toString(); }
+  }
   
-  int dragIndex;
-  boolean isDraggingHandleWithOppHandle;
-  boolean isDraggingAnchor;
+  public enum DragType { Anchor, Control };
   
-  Vector2 drag;
-  Vector2 anchor;
-  Vector2 dragOppHandle;
-  Vector2 dragAnchor;
-  Vector2 dragHandle1;
-  Vector2 dragHandle2;
+  DragType dragType = null;
+  Vector2 draggingPoint = null;
+  Vector2 followingPoint1 = null;
+  Vector2 followingPoint2 = null;
   
-  boolean drawConnections = true;
-  boolean drawHandles = true;
-  boolean drawAnchors = true;
+  ArrayList<BezierCurve> splines = new ArrayList();
+  final int hoverDistance = 10;
+  final int splineSize = 50;
+  final int pointsPerSpline = 30;
   
-  final float hoverDistance = 10.0;
-  final int splineSize = 30;
-  ArrayList<Vector2> points = new ArrayList();
-
   void setup()
   {
     surface.setSize(1000, 700);
+    BezierCurve spline = new BezierCurve();
+    spline.addPoint(new Vector2(100.0, 100.0));
+    spline.addPoint(new Vector2(300.0, 300.0));
+    splines.add(spline);
+    drawSplines();
   }
   
   void draw()
   {
-    background(120);
-    for(int i = 0; i < points.size(); i++){
-      Vector2 point = points.get(i);
-      stroke(100);
-      if(i>0 && drawConnections){
-        line((float) points.get(i).x, (float) points.get(i).y, (float) points.get(i-1).x, (float) points.get(i-1).y);
-      }
-      stroke(225);
-      if(drawHandles || (drawAnchors && isAnchor(i))){
-        circle((float) point.x, (float) point.y, 5.0);
+    background(100);
+    BezierCurve spline; Vector2 point; Vector2 lastPoint = null;
+    for(int s = 0; s < splines.size(); s++){
+      spline = splines.get(s);
+      for(int i = 0; i < spline.size(); i++){
+        point = spline.getWaypoint(i);
+        stroke(60);
+        if(lastPoint != null) {
+          line(point.x, point.y, lastPoint.x, lastPoint.y);
+        }
+        lastPoint = point;
+        stroke(225);
+        circle(point.x, point.y, 6.0);
       }
     }
-    noFill();
-    drawSpline();
-    fill(255);
+
+    stroke(255);
+    drawSplines();
   }
   
-  void drawSpline(){
-    for(int i = 3; i < points.size(); i += 3){
-      bezier(
-        (float) points.get(i-3).x,
-        (float) points.get(i-3).y,
-        (float) points.get(i-2).x,
-        (float) points.get(i-2).y,
-        (float) points.get(i-1).x,
-        (float) points.get(i-1).y,
-        (float) points.get(i).x,
-        (float) points.get(i).y
-      );
+  void drawSplines(){
+    if(splines.size() == 0) return;
+    Vector2 lastPoint;
+    Vector2 point;
+    for(BezierCurve spline : splines){
+      if(splines.size() == 0) return;
+      lastPoint = spline.getWaypoint(0);
+      for(float i=0; i<=1; i+= 1.0/pointsPerSpline){
+        point = spline.getPoint(i);
+        circle(point.x, point.y, 3f);
+        line(point.x, point.y, lastPoint.x, lastPoint.y);
+        lastPoint = point;
+      }
+      point = spline.lastPoint();
+      line(point.x, point.y, lastPoint.x, lastPoint.y);
     }
   }
-    
-  boolean hasOppHandle(int index){ return index % 3 != 0 && index != 1 && (index % 3 != 2 || index + 2 < points.size()); }
-  boolean isAnchor(int index){ return index % 3 == 0; }
-  int getOppHandleIndex(int index) { return index % 3 == 1 ? index - 2 : index + 2; }
-  int getAnchorIndex(int index) { return index % 3 == 1 ? index - 1 : index + 1; }
+  
+  void addPoint(int x, int y){
+    Vector2 point = new Vector2(x,y);
+    for(BezierCurve spline: splines){
+      for(int i=1;i<spline.size();i++){
+        if(isInline(point, spline.getWaypoint(i-1), spline.getWaypoint(i))){
+          spline.addPoint(new Vector2(x,y), i);
+          return;
+        }
+      }
+    }
+    if( splines.size() > 0 ) {
+      splines.add(new BezierCurve(splines.get(splines.size()-1).lastPoint(), point));
+    } else {
+      splines.add(new BezierCurve(point));
+    }
+  }
+  
+  void movePoint(){
+    BezierCurve lastSpline = null;
+    for(BezierCurve spline : splines){
+      for(int i = 0;i < spline.size();i++){
+        Vector2 point = spline.getWaypoint(i);
+        if(Math.sqrt(Math.pow(point.x - mouseX, 2) + Math.pow(point.y - mouseY, 2)) < hoverDistance){
+          if(keyPressed && keyCode == SHIFT){
+            spline.removePoint(point);
+            return;
+          }
+          draggingPoint = point;
+          println(i);
+          println(lastSpline != null);
+          if(i == 0 && lastSpline != null){
+            dragType = DragType.Anchor;
+            followingPoint1 = spline.firstControl();
+            followingPoint2 = lastSpline.lastControl();
+          } else if(i == 1 && lastSpline != null){
+            dragType = DragType.Control;
+            followingPoint1 = spline.firstPoint();
+            followingPoint2 = lastSpline.firstControl();
+          } else {
+            dragType = null;
+          }
+          println(dragType);
+          return;
+        }
+      }
+      lastSpline = spline;
+    }
+  }
+  
+  Vector2 getWaypoint(Float x, Float y){
+    for(BezierCurve spline : splines){
+      for(int i = 0;i < spline.size();i++){
+        Vector2 point = spline.getWaypoint(i);
+        if(Math.sqrt(Math.pow(point.x - x, 2) + Math.pow(point.y - y, 2)) < hoverDistance){
+          return point;
+        }
+      }
+    }
+    return null;
+  }
+  
+  void interlopePoint(float x, float y){
+    for(BezierCurve spline : splines){
+      for(int i = 0;i < spline.size();i++){
+        Vector2 point = spline.getWaypoint(i);
+        if(Math.sqrt(Math.pow(point.x - x, 2) + Math.pow(point.y - y, 2)) < hoverDistance){
+        }
+      }
+    }
+  }
+  
+  boolean isInline(Vector2 point, Vector2 point1, Vector2 point2){
+    println(point.x + " " + point1.x);
+    double ux = Math.abs( (point.x-point1.x) / (point2.x-point1.x) );
+    double uy = Math.abs( (point.y-point1.y) / (point2.y-point1.y) );
+    println(ux + " " + uy);
+    if( ux < 0 || ux > 1 || uy < 0 || uy > 1){
+      println("to far");
+      return false;
+    }
+    return Math.abs( ux - uy ) < 0.2; 
+  }
+  
   
   void mousePressed(){
     if(mouseButton == RIGHT){
-      if(anchor == null){
-        anchor = new Vector2(mouseX, mouseY);
-        points.add(anchor);
-      }
-      else{
-        if(points.size() > 1){
-          points.add(
-            points.size()-1, 
-            new Vector2( anchor.x*2 - mouseX, anchor.y*2 - mouseY)
-          );
-        }
-        //points.add(anchor);
-        points.add(new Vector2(mouseX, mouseY));
-        anchor = null;
-      }
-    }
-    else if(mouseButton == LEFT){
-      for(int i = 0;i < points.size();i++){
-        Vector2 point = points.get(i);
-        if(Math.sqrt(Math.pow(point.x - mouseX, 2) + Math.pow(point.y - mouseY, 2)) < hoverDistance){
-          drag = point;
-          if(hasOppHandle(i)) {
-            dragOppHandle = points.get(getOppHandleIndex(i));
-            dragAnchor = points.get(getAnchorIndex(i));    
-          }
-          else if(isAnchor(i)){
-            if(i > 0){
-                dragHandle1 = points.get(i-1);
-            }
-            if(i < points.size()){
-                dragHandle2 = points.get(i+1);
-            }
-          }
-          if(keyCode == 16 && keyPressed){
-            if(drag == anchor){
-              anchor = null;
-            }
-            points.remove(drag);
-            points.remove(dragOppHandle);
-            points.remove(dragAnchor);
-            points.remove(dragHandle1);
-            points.remove(dragHandle2);
-          }
-          break;
-        }
-      }
+      addPoint(mouseX, mouseY);
+    } else if (mouseButton == CENTER){
+      interlopePoint(mouseX, mouseY);
+    } else if(mouseButton == LEFT){
+       movePoint();
     }
   }
   
   void mouseDragged(){
-    if(!(drag == null)){
-      double deltaX = mouseX - drag.x;
-      double deltaY = mouseY - drag.y;
-      drag.x = mouseX;
-      drag.y = mouseY;
-      if(dragOppHandle != null){
-        dragOppHandle.x = dragAnchor.x*2 - mouseX;
-        dragOppHandle.y = dragAnchor.y*2 - mouseY;
-      }
-      else if(dragHandle2 != null){
-        dragHandle2.x += deltaX;
-        dragHandle2.y += deltaY;
-        if(dragHandle1 != null){
-          dragHandle1.x += deltaX;
-          dragHandle1.y += deltaY;
-        }
-      }
+    if(draggingPoint == null) return;
+    draggingPoint.x = mouseX;
+    draggingPoint.y = mouseY;
+    if(dragType == null) return;
+    if(dragType == DragType.Anchor){
+    
+    } else if (dragType == DragType.Control){
+      
     }
   }
   
   void mouseReleased(){
-    drag = null;
-    dragOppHandle = null;
-    dragAnchor = null;
-    dragHandle1 = null;
-    dragHandle2 = null;
+    draggingPoint = null;
+    followingPoint1 = null;
+    followingPoint2 = null;
   }
   
-  void keyPressed(){ 
-    if(key == ' '){
-      if (drawConnections) drawConnections = false;
-      else if (drawHandles) drawHandles = false;
-      else if (drawAnchors) drawAnchors = false;
-      else {
-        drawConnections = true;
-        drawHandles = true;
-        drawAnchors = true;
-      }
-    }
-  }
-  
-  Vector2 csit(Vector2 a, Vector2 b, Vector2 c, Vector2 d, double t){
-    //t^3*a + 3*t^2*(1-t)*b + 3*t*(1-t)^2*c + (1-t)^3*d
-    return d.mult(Math.pow(t,3))
-      .add(c.mult(3*Math.pow(t,2)*(1-t)))
-      .add(b.mult(3*t*Math.pow(1-t,2)))
-      .add(a.mult(Math.pow(1-t,3)));
-  }
 }
